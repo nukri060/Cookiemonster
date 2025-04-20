@@ -11,6 +11,9 @@ Project is in early development stage. Basic functionality for cleaning temporar
 ### Implemented
 - Temporary files cleaning
 - Recycle bin cleaning
+- Administrator rights check
+- Cleaning statistics
+- User-friendly console interface
 
 ### In Development
 - Browser cache cleaning
@@ -22,9 +25,10 @@ Project is in early development stage. Basic functionality for cleaning temporar
 ## 🛠️ Requirements
 
 - Windows 10 or newer
-- Visual Studio 2019 or newer
-- CMake 3.10 or newer
-- C++17 or newer
+- Administrator rights (for full functionality)
+- Visual Studio 2022 with C++ development tools (for building)
+- CMake 3.15 or newer
+- NSIS 3.0 or later (for creating installer)
 
 ## 🚀 Building
 
@@ -72,3 +76,54 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🤝 Support
 
 If you find this project useful, please consider giving it a star ⭐ 
+
+## 📦 Installation
+
+### Using Installer (Recommended)
+1. Download the latest `CookieMonster_Setup.exe`
+2. Run the installer as administrator
+3. Follow the installation wizard
+4. Launch CookieMonster from the Start Menu
+
+### Manual Build
+1. Clone the repository
+2. Create a build directory:
+```bash
+mkdir build
+cd build
+```
+3. Generate Visual Studio solution:
+```bash
+cmake ..
+```
+4. Build the project:
+```bash
+cmake --build . --config Release
+```
+
+The executable will be created in `build/Release/cookiemonster.exe`
+
+## 📊 Usage
+
+1. Run the program as administrator for full functionality
+2. Select an option from the menu:
+   - Clean Temporary Files
+   - Clean Recycle Bin
+   - Clean All
+   - Exit
+3. View cleaning statistics after each operation
+
+## 📦 Building Installer
+
+To create the installer:
+1. Install NSIS from https://nsis.sourceforge.io/Download
+2. Run `build_installer.bat`
+3. The installer will be created as `CookieMonster_Setup.exe`
+
+## 🚨 Warning
+
+This program deletes files permanently. Use with caution. Files deleted cannot be recovered.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details. 
