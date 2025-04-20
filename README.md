@@ -1,50 +1,74 @@
-# CookieMonster
+# CookieMonster 🍪
 
-A system cleaning utility with a modern interface.
+A modern system cleaning utility for Windows with a focus on performance and user experience.
 
-## Current Status
+## 📋 Current Status
 
-Project is in early development stage.
+Project is in early development stage. Basic functionality for cleaning temporary files and recycle bin is implemented.
 
-## Features
+## ✨ Features
 
+### Implemented
 - Temporary files cleaning
 - Recycle bin cleaning
-- Browser cache cleaning (in development)
-- Registry cleaning (in development)
 
-## Requirements
+### In Development
+- Browser cache cleaning
+- Registry cleaning
+- Modern GUI interface
+- Scheduled cleaning tasks
+- Detailed cleaning reports
+
+## 🛠️ Requirements
 
 - Windows 10 or newer
 - Visual Studio 2019 or newer
 - CMake 3.10 or newer
+- C++17 or newer
 
-## Building
+## 🚀 Building
 
-1. Create build directory:
+1. Clone the repository:
+```bash
+git clone https://github.com/nukri060/Cookiemonster.git
+cd Cookiemonster
+```
+
+2. Create build directory:
 ```bash
 mkdir build
 cd build
 ```
 
-2. Generate project:
+3. Generate project:
 ```bash
 cmake ..
 ```
 
-3. Build project:
+4. Build project:
 ```bash
 cmake --build . --config Release
 ```
 
-## Usage
+## 💻 Usage
 
-Run the `systemcleaner.exe` with administrator privileges for full system access.
+Run the `systemcleaner.exe` with administrator privileges for full system access:
+```bash
+./Release/systemcleaner.exe
+```
 
-## Security
+## ⚠️ Security
 
 It is recommended to create a system restore point before using the application.
 
-## License
+## 📝 Contributing
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🤝 Support
+
+If you find this project useful, please consider giving it a star ⭐ 
