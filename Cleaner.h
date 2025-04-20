@@ -22,4 +22,10 @@ private:
     bool deleteFile(const std::string& path);
     bool deleteDirectory(const std::wstring& path);
     std::vector<std::wstring> getTempDirectories() const;
+    
+    // Statistics
+    struct TempFilesStats {
+        int filesDeleted = 0;
+        int errors = 0;
+    } tempStats;
 }; 

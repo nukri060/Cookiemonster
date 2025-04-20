@@ -6,6 +6,7 @@
 
 Cleaner::Cleaner() {
     std::cout << "Cleaner initialized" << std::endl;
+    tempStats = TempFilesStats();
 }
 
 Cleaner::~Cleaner() {
@@ -16,6 +17,7 @@ bool Cleaner::cleanTempFiles() {
     std::cout << "Starting temp files cleanup..." << std::endl;
     std::vector<std::wstring> tempDirs = getTempDirectories();
     bool success = true;
+    tempStats = TempFilesStats();
 
     for (const auto& dir : tempDirs) {
         try {
@@ -23,16 +25,19 @@ bool Cleaner::cleanTempFiles() {
                 try {
                     if (std::filesystem::is_regular_file(entry)) {
                         std::filesystem::remove(entry.path());
+                        tempStats.filesDeleted++;
                     }
                 }
                 catch (const std::exception& e) {
                     std::wcerr << L"Error deleting file: " << entry.path().wstring() << std::endl;
+                    tempStats.errors++;
                     success = false;
                 }
             }
         }
         catch (const std::exception& e) {
             std::wcerr << L"Error accessing directory: " << dir << std::endl;
+            tempStats.errors++;
             success = false;
         }
     }
@@ -76,7 +81,9 @@ bool Cleaner::isAdmin() const {
 }
 
 void Cleaner::showStatistics() const {
-    // TODO: Implement statistics display
+    std::cout << "Cleaning Statistics:" << std::endl;
+    std::cout << "Files deleted: " << tempStats.filesDeleted << std::endl;
+    std::cout << "Errors encountered: " << tempStats.errors << std::endl;
 }
 
 std::vector<std::wstring> Cleaner::getTempDirectories() const {
@@ -102,11 +109,13 @@ bool Cleaner::deleteFile(const std::string& path) {
     try {
         if (std::filesystem::exists(path)) {
             std::filesystem::remove(path);
+            tempStats.filesDeleted++;
             return true;
         }
     }
     catch (const std::exception& e) {
         std::cerr << "Error deleting file: " << e.what() << std::endl;
+        tempStats.errors++;
     }
     return false;
 } 

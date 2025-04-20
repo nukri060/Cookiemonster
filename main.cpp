@@ -14,5 +14,8 @@ int main() {
     cleaner.cleanTempFiles();
     cleaner.cleanRecycleBin();
     
+    // Show cleaning statistics
+    cleaner.showStatistics();
+    
     return 0;
 } 
