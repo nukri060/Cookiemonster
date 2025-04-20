@@ -1,6 +1,14 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <iostream>
+#include <windows.h>
+#include <shlobj.h>
+
+struct TempFilesStats {
+    int filesDeleted = 0;
+    int errors = 0;
+};
 
 class Cleaner {
 public:
@@ -23,9 +31,5 @@ private:
     bool deleteDirectory(const std::wstring& path);
     std::vector<std::wstring> getTempDirectories() const;
     
-    // Statistics
-    struct TempFilesStats {
-        int filesDeleted = 0;
-        int errors = 0;
-    } tempStats;
+    TempFilesStats tempStats;
 }; 
