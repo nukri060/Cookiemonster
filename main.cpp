@@ -3,9 +3,12 @@
 
 int main() {
     std::cout << "CookieMonster v0.1" << std::endl;
-    std::cout << "Initial development started..." << std::endl;
     
     Cleaner cleaner;
+    
+    if (!cleaner.isAdmin()) {
+        std::cout << "Warning: Running without administrator privileges. Some features may not work properly." << std::endl;
+    }
     
     // Test basic functionality
     cleaner.cleanTempFiles();
