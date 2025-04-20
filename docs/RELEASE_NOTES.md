@@ -26,5 +26,9 @@
 - Always download from the official GitHub releases page
 - Verify the SHA-256 checksum before installation
 
+# File Checksums
+## CookieMonster_Setup.exe v1.1.0
+### SHA-256 
+
 ## Feedback
 Please report any issues or suggestions on our GitHub Issues page. 
