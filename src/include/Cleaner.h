@@ -10,6 +10,11 @@ struct TempFilesStats {
     int errors = 0;
 };
 
+struct RecycleBinStats {
+    int filesDeleted = 0;
+    int errors = 0;
+};
+
 class Cleaner {
 public:
     Cleaner();
@@ -32,4 +37,5 @@ private:
     std::vector<std::wstring> getTempDirectories() const;
     
     TempFilesStats tempStats;
+    RecycleBinStats recycleBinStats;
 }; 

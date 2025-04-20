@@ -4,14 +4,18 @@
 #include <iostream>
 #include <filesystem>
 
-Cleaner::Cleaner() : tempStats() {}
+Cleaner::Cleaner() : tempStats(), recycleBinStats() {}
 
 Cleaner::~Cleaner() {}
 
 void Cleaner::showStatistics() const {
     std::cout << "\nCleaning Statistics:\n";
-    std::cout << "Files deleted: " << tempStats.filesDeleted << "\n";
-    std::cout << "Errors encountered: " << tempStats.errors << "\n";
+    std::cout << "Temporary Files:\n";
+    std::cout << "  Files deleted: " << tempStats.filesDeleted << "\n";
+    std::cout << "  Errors encountered: " << tempStats.errors << "\n";
+    std::cout << "Recycle Bin:\n";
+    std::cout << "  Files deleted: " << recycleBinStats.filesDeleted << "\n";
+    std::cout << "  Errors encountered: " << recycleBinStats.errors << "\n";
 }
 
 bool Cleaner::cleanTempFiles() {
@@ -41,8 +45,31 @@ bool Cleaner::cleanTempFiles() {
 }
 
 bool Cleaner::cleanRecycleBin() {
-    SHEmptyRecycleBin(NULL, NULL, SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND);
-    return true;
+    recycleBinStats = RecycleBinStats(); // Reset statistics
+    
+    try {
+        // Get the number of items in recycle bin before cleaning
+        SHQUERYRBINFO rbInfo = { sizeof(SHQUERYRBINFO) };
+        if (SUCCEEDED(SHQueryRecycleBin(NULL, &rbInfo))) {
+            HRESULT result = SHEmptyRecycleBin(NULL, NULL, SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND);
+            if (SUCCEEDED(result)) {
+                recycleBinStats.filesDeleted = static_cast<int>(rbInfo.i64NumItems);
+                return true;
+            } else {
+                recycleBinStats.errors++;
+                std::cerr << "Failed to empty recycle bin. Error code: " << result << std::endl;
+                return false;
+            }
+        } else {
+            recycleBinStats.errors++;
+            std::cerr << "Failed to query recycle bin info." << std::endl;
+            return false;
+        }
+    } catch (const std::exception& e) {
+        recycleBinStats.errors++;
+        std::cerr << "Exception while cleaning recycle bin: " << e.what() << std::endl;
+        return false;
+    }
 }
 
 bool Cleaner::deleteDirectory(const std::wstring& path) {
