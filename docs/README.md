@@ -1,38 +1,33 @@
-# CookieMonster 🍪
+# CookieMonster
 
-A modern system cleaning utility for Windows with a focus on performance and user experience.
+A Windows utility for cleaning temporary files and system maintenance.
 
-## 📋 Current Status
+## Features
 
-Project is in early development stage. Basic functionality for cleaning temporary files and recycle bin is implemented.
+- Clean temporary files
+- Empty recycle bin
+- Check administrator rights
+- Show cleaning statistics
+- Simple console interface
 
-## ✨ Features
+## Requirements
 
-### Implemented
-- Temporary files cleaning
-- Recycle bin cleaning
-- Administrator rights check
-- Cleaning statistics
-- User-friendly console interface
+- Windows 10 or later
+- Administrator rights
+- Visual Studio 2022 with C++ tools
+- CMake 3.15 or later
+- NSIS 3.0 or later (for installer)
 
-### In Development
-- Browser cache cleaning
-- Registry cleaning
-- Modern GUI interface
-- Scheduled cleaning tasks
-- Detailed cleaning reports
+## Installation
 
-## 🛠️ Requirements
+### Using Installer
+1. Download `CookieMonster_Setup.exe` from [Releases](https://github.com/nukri060/Cookiemonster/releases)
+2. Run installer as administrator
+3. Follow installation steps
+4. Launch from Start Menu
 
-- Windows 10 or newer
-- Administrator rights (for full functionality)
-- Visual Studio 2022 with C++ development tools (for building)
-- CMake 3.15 or newer
-- NSIS 3.0 or later (for creating installer)
-
-## 🚀 Building
-
-1. Clone the repository:
+### Manual Build
+1. Clone repository:
 ```bash
 git clone https://github.com/nukri060/Cookiemonster.git
 cd Cookiemonster
@@ -49,81 +44,47 @@ cd build
 cmake ..
 ```
 
-4. Build project:
+4. Build:
 ```bash
 cmake --build . --config Release
 ```
 
-## 💻 Usage
+## Usage
 
-Run the `systemcleaner.exe` with administrator privileges for full system access:
-```bash
-./Release/systemcleaner.exe
-```
-
-## ⚠️ Security
-
-It is recommended to create a system restore point before using the application.
-
-## 📝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🤝 Support
-
-If you find this project useful, please consider giving it a star ⭐ 
-
-## 📦 Installation
-
-### Using Installer (Recommended)
-1. Download the latest `CookieMonster_Setup.exe`
-2. Run the installer as administrator
-3. Follow the installation wizard
-4. Launch CookieMonster from the Start Menu
-
-### Manual Build
-1. Clone the repository
-2. Create a build directory:
-```bash
-mkdir build
-cd build
-```
-3. Generate Visual Studio solution:
-```bash
-cmake ..
-```
-4. Build the project:
-```bash
-cmake --build . --config Release
-```
-
-The executable will be created in `build/Release/cookiemonster.exe`
-
-## 📊 Usage
-
-1. Run the program as administrator for full functionality
-2. Select an option from the menu:
+1. Run program as administrator
+2. Select option from menu:
    - Clean Temporary Files
    - Clean Recycle Bin
    - Clean All
    - Exit
-3. View cleaning statistics after each operation
+3. View statistics after cleaning
 
-## 📦 Building Installer
+## Project Structure
 
-To create the installer:
-1. Install NSIS from https://nsis.sourceforge.io/Download
-2. Run `build_installer.bat`
-3. The installer will be created as `CookieMonster_Setup.exe`
+```
+Cookiemonster/
+├── src/                    # Source code
+│   ├── include/           # Header files
+│   └── source/            # Implementation files
+├── docs/                  # Documentation
+├── installer/             # Installer files
+└── tests/                 # Test files
+```
 
-## 🚨 Warning
+## Building Installer
 
-This program deletes files permanently. Use with caution. Files deleted cannot be recovered.
+1. Install NSIS from [nsis.sourceforge.io](https://nsis.sourceforge.io/Download)
+2. Run `installer/build_installer.bat`
+3. Installer will be created as `CookieMonster_Setup.exe`
 
-## 📄 License
+## Contributing
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+1. Fork repository
+2. Create feature branch
+3. Commit changes
+4. Push to branch
+5. Create Pull Request
+
+## License
+
+This project is licensed under the MIT License - see [LICENSE](LICENSE) file for details. 
