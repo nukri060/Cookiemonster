@@ -8,11 +8,13 @@
 struct TempFilesStats {
     int filesDeleted = 0;
     int errors = 0;
+    uint64_t bytesFreed = 0;  // Size in bytes
 };
 
 struct RecycleBinStats {
     int filesDeleted = 0;
     int errors = 0;
+    uint64_t bytesFreed = 0;  // Size in bytes
 };
 
 class Cleaner {
@@ -35,6 +37,7 @@ private:
     bool deleteFile(const std::string& path);
     bool deleteDirectory(const std::wstring& path);
     std::vector<std::wstring> getTempDirectories() const;
+    std::string formatSize(uint64_t bytes) const;  // Helper to format size
     
     TempFilesStats tempStats;
     RecycleBinStats recycleBinStats;
