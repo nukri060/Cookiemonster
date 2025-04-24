@@ -2,7 +2,7 @@
 build/ 
 out/ 
 bin/ 
-obj/ 
+lib/ 
  
 # IDE files 
 .vs/ 
@@ -11,20 +11,47 @@ obj/
 *.vcxproj 
 *.vcxproj.filters 
 *.vcxproj.user 
+*.suo 
+*.user 
+*.userosscache 
+*.sdf 
+*.opensdf 
+*.db 
+*.opendb 
  
 # Compiled files 
 *.exe 
 *.dll 
+*.so 
+*.dylib 
 *.lib 
 *.obj 
 *.pdb 
+*.ilk 
+*.idb 
+*.pch 
  
 # CMake generated files 
 CMakeCache.txt 
 CMakeFiles/ 
+cmake_install.cmake 
+install_manifest.txt 
+compile_commands.json 
+CTestTestfile.cmake 
+_deps/ 
 *.cmake 
 Makefile 
  
 # Logs and databases 
 *.log 
 *.sqlite 
+*.db 
+
+# OS generated files 
+.DS_Store 
+.DS_Store? 
+._* 
+.Spotlight-V100 
+.Trashes 
+ehthumbs.db 
+Thumbs.db 
