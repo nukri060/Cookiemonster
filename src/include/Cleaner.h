@@ -31,13 +31,13 @@ public:
     // Utility functions
     bool isAdmin() const;
     void showStatistics() const;
+    std::string formatSize(uint64_t bytes) const;  // Helper to format size
 
 private:
     // Helper methods
     bool deleteFile(const std::string& path);
     bool deleteDirectory(const std::wstring& path);
     std::vector<std::wstring> getTempDirectories() const;
-    std::string formatSize(uint64_t bytes) const;  // Helper to format size
     
     TempFilesStats tempStats;
     RecycleBinStats recycleBinStats;
