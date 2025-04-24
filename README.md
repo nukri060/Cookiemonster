@@ -17,11 +17,21 @@ A Windows system cleanup and maintenance tool written in C++.
 - Visual Studio 2019 or later with C++17 support
 - CMake 3.15 or later
 
-## Building
+## Installation
 
-### Using CMake
+### Using the Installer
+
+1. Download the latest release from the [releases page](https://github.com/nukri060/Cookiemonster/releases)
+2. Run the installer and follow the instructions
+3. The program will be installed in `C:\Program Files\CookieMonster`
+
+### Building from Source
 
 ```bash
+# Clone the repository
+git clone https://github.com/nukri060/Cookiemonster.git
+cd Cookiemonster
+
 # Create build directory
 mkdir build
 cd build
@@ -43,6 +53,15 @@ Run the program with administrator privileges:
 CookieMonster.exe
 ```
 
+## Testing
+
+The project uses Google Test for unit testing. To run the tests:
+
+```bash
+# From the build directory
+ctest --output-on-failure
+```
+
 ## Project Structure
 
 ```
@@ -54,6 +73,7 @@ CookieMonster/
 │       └── Cleaner.cpp
 ├── tests/                 # Test files
 ├── docs/                  # Documentation
+├── installer/             # Installer scripts
 ├── CMakeLists.txt         # CMake configuration
 └── README.md             # This file
 ```
@@ -61,10 +81,12 @@ CookieMonster/
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Create a Pull Request
+
+Please follow the [Conventional Commits](https://www.conventionalcommits.org/) specification for commit messages.
 
 ## License
 
@@ -72,5 +94,9 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Authors
 
-- Original Author: [Your Name]
-- Contributors: [List of contributors] 
+- [Nukri060](https://github.com/nukri060) - Original Author
+- Contributors are welcome!
+
+## Version
+
+Current version: 1.0.0 
