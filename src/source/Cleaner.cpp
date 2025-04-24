@@ -1,6 +1,8 @@
 #include "Cleaner.h"
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <shlobj.h>
+#include <shellapi.h>
 #include <iostream>
 #include <filesystem>
 #include <iomanip>
@@ -66,67 +68,28 @@ bool Cleaner::cleanTempFiles() {
 }
 
 bool Cleaner::cleanRecycleBin() {
-    recycleBinStats = RecycleBinStats();
-    
-    try {
-        // Load Shell32.dll
-        HMODULE hShell32 = LoadLibraryW(L"Shell32.dll");
-        if (!hShell32) {
-            std::cerr << "Error loading Shell32.dll: " << GetLastError() << std::endl;
-            recycleBinStats.errors++;
-            return false;
-        }
-
-        // Get function pointers
-        typedef HRESULT (WINAPI *SHQueryRecycleBinW_t)(LPCWSTR, LPSHQUERYRBINFO);
-        typedef HRESULT (WINAPI *SHEmptyRecycleBinW_t)(HWND, LPCWSTR, DWORD);
-        
-        auto SHQueryRecycleBinW = (SHQueryRecycleBinW_t)GetProcAddress(hShell32, "SHQueryRecycleBinW");
-        auto SHEmptyRecycleBinW = (SHEmptyRecycleBinW_t)GetProcAddress(hShell32, "SHEmptyRecycleBinW");
-
-        if (!SHQueryRecycleBinW || !SHEmptyRecycleBinW) {
-            std::cerr << "Failed to get function pointers" << std::endl;
-            FreeLibrary(hShell32);
-            recycleBinStats.errors++;
-            return false;
-        }
-
-        // Get recycle bin info
-        SHQUERYRBINFO rbInfo;
-        ZeroMemory(&rbInfo, sizeof(SHQUERYRBINFO));
-        rbInfo.cbSize = sizeof(SHQUERYRBINFO);
-
-        // Query recycle bin info for all drives
-        HRESULT hr = SHQueryRecycleBinW(NULL, &rbInfo);
-        if (SUCCEEDED(hr)) {
-            std::cout << "Found " << rbInfo.i64NumItems << " items in recycle bin ("
-                      << formatSize(rbInfo.i64Size) << ")" << std::endl;
-
-            // Empty the recycle bin
-            hr = SHEmptyRecycleBinW(NULL, NULL, SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND);
-            if (SUCCEEDED(hr)) {
-                recycleBinStats.filesDeleted = static_cast<int>(rbInfo.i64NumItems);
-                recycleBinStats.bytesFreed = rbInfo.i64Size;
-                std::cout << "Successfully emptied recycle bin" << std::endl;
-                FreeLibrary(hShell32);
-                return true;
-            } else {
-                std::cerr << "Failed to empty recycle bin. Error code: 0x" << std::hex << hr << std::dec << std::endl;
-                recycleBinStats.errors++;
-                FreeLibrary(hShell32);
-                return false;
-            }
-        } else {
-            std::cerr << "Failed to query recycle bin info. Error code: 0x" << std::hex << hr << std::dec << std::endl;
-            recycleBinStats.errors++;
-            FreeLibrary(hShell32);
-            return false;
-        }
-    } catch (const std::exception& e) {
-        std::cerr << "Exception while cleaning recycle bin: " << e.what() << std::endl;
-        recycleBinStats.errors++;
+    if (!isAdmin()) {
+        std::cerr << "Administrator privileges required for recycle bin cleaning." << std::endl;
         return false;
     }
+
+    // Get recycle bin info
+    SHQUERYRBINFO rbInfo = {};
+    rbInfo.cbSize = sizeof(SHQUERYRBINFO);
+    
+    if (SUCCEEDED(SHQueryRecycleBinW(NULL, &rbInfo))) {
+        recycleBinStats.filesDeleted = static_cast<int>(rbInfo.i64NumItems);
+        recycleBinStats.bytesFreed = rbInfo.i64Size;
+    }
+
+    // Empty recycle bin
+    if (SUCCEEDED(SHEmptyRecycleBinW(NULL, NULL, 
+        SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND))) {
+        return true;
+    }
+    
+    std::cerr << "Failed to empty recycle bin." << std::endl;
+    return false;
 }
 
 bool Cleaner::deleteDirectory(const std::wstring& path) {

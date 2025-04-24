@@ -24,6 +24,7 @@ FetchContent_MakeAvailable(Catch2)
 # Add source files
 set(SOURCES
     src/source/Cleaner.cpp
+    src/source/main.cpp
 )
 
 # Add header files

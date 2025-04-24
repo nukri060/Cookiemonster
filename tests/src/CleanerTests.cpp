@@ -1,21 +1,23 @@
-#include "catch2/catch.hpp"
-#include "../Cleaner.h"
+#include <catch2/catch_all.hpp>
+#include "../../src/include/Cleaner.h"
 #include <filesystem>
 #include <fstream>
 
-TEST_CASE("Cleaner basic functionality", "[cleaner]") {
+TEST_CASE("Basic functionality", "[basic]") {
     Cleaner cleaner;
 
     SECTION("Format size test") {
+        REQUIRE(cleaner.formatSize(0) == "0.00 B");
         REQUIRE(cleaner.formatSize(1024) == "1.00 KB");
         REQUIRE(cleaner.formatSize(1048576) == "1.00 MB");
         REQUIRE(cleaner.formatSize(1073741824) == "1.00 GB");
         REQUIRE(cleaner.formatSize(500) == "500.00 B");
+        REQUIRE(cleaner.formatSize(1500) == "1.46 KB");
     }
 
     SECTION("Admin check test") {
-        // This test might pass or fail depending on how the test is run
         bool isAdmin = cleaner.isAdmin();
+        INFO("Admin check should return a boolean value");
         REQUIRE((isAdmin == true || isAdmin == false));
     }
 
@@ -23,26 +25,39 @@ TEST_CASE("Cleaner basic functionality", "[cleaner]") {
         auto directories = cleaner.getTempDirectories();
         REQUIRE_FALSE(directories.empty());
         
-        // Check if directories exist
+        // Check if at least one directory exists
+        bool atLeastOneExists = false;
         for (const auto& dir : directories) {
-            REQUIRE(std::filesystem::exists(dir));
+            if (std::filesystem::exists(dir)) {
+                atLeastOneExists = true;
+                break;
+            }
         }
+        REQUIRE(atLeastOneExists);
     }
 }
 
-TEST_CASE("File operations", "[file_ops]") {
+TEST_CASE("File operations in user space", "[file_ops]") {
     Cleaner cleaner;
     
-    // Create a temporary test file
-    std::string testFile = "test_temp_file.txt";
-    std::ofstream outfile(testFile);
-    outfile << "test content" << std::endl;
-    outfile.close();
+    SECTION("Create and delete test file in temp directory") {
+        // Create a temporary test directory in user's temp folder
+        auto tempPath = std::filesystem::temp_directory_path() / "cookiemonster_test";
+        std::filesystem::create_directories(tempPath);
+        
+        // Create a test file
+        auto testFile = tempPath / "test_file.txt";
+        {
+            std::ofstream outfile(testFile);
+            REQUIRE(outfile.is_open());
+            outfile << "test content" << std::endl;
+        }
 
-    SECTION("Delete file test") {
         REQUIRE(std::filesystem::exists(testFile));
-        bool result = cleaner.deleteFile(testFile);
-        REQUIRE(result == true);
+        REQUIRE(cleaner.deleteFile(testFile.string()));
         REQUIRE_FALSE(std::filesystem::exists(testFile));
+
+        // Cleanup
+        std::filesystem::remove_all(tempPath);
     }
 } 

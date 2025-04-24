@@ -32,12 +32,12 @@ public:
     bool isAdmin() const;
     void showStatistics() const;
     std::string formatSize(uint64_t bytes) const;  // Helper to format size
+    std::vector<std::wstring> getTempDirectories() const;
+    bool deleteFile(const std::string& path);
 
 private:
     // Helper methods
-    bool deleteFile(const std::string& path);
     bool deleteDirectory(const std::wstring& path);
-    std::vector<std::wstring> getTempDirectories() const;
     
     TempFilesStats tempStats;
     RecycleBinStats recycleBinStats;
