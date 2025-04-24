@@ -12,6 +12,15 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
+# Add Catch2
+include(FetchContent)
+FetchContent_Declare(
+    Catch2
+    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+    GIT_TAG v3.3.2
+)
+FetchContent_MakeAvailable(Catch2)
+
 # Add source files
 set(SOURCES
     src/source/Cleaner.cpp
@@ -41,6 +50,30 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     shell32
     shlwapi
 )
+
+# Add tests
+set(TEST_SOURCES
+    tests/src/CleanerTests.cpp
+)
+
+# Create test executable
+add_executable(${PROJECT_NAME}_tests ${TEST_SOURCES} ${SOURCES})
+
+# Link test executable with Catch2
+target_link_libraries(${PROJECT_NAME}_tests PRIVATE
+    Catch2::Catch2WithMain
+    shell32
+    shlwapi
+)
+
+# Set include directories for tests
+target_include_directories(${PROJECT_NAME}_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/include
+)
+
+# Enable testing
+enable_testing()
+add_test(NAME ${PROJECT_NAME}_tests COMMAND ${PROJECT_NAME}_tests)
 
 # Install rules
 install(TARGETS ${PROJECT_NAME}
