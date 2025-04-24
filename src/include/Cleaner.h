@@ -17,6 +17,13 @@ struct RecycleBinStats {
     uint64_t bytesFreed = 0;  // Size in bytes
 };
 
+struct BrowserCacheStats {
+    int filesDeleted = 0;
+    int errors = 0;
+    uint64_t bytesFreed = 0;  // Size in bytes
+    std::string browserName;
+};
+
 class Cleaner {
 public:
     Cleaner();
@@ -28,6 +35,10 @@ public:
     bool cleanRecycleBin();
     bool cleanRegistry();
 
+    // Browser-specific cleaning functions
+    bool cleanChromiumCache();  // For Chrome and Edge
+    bool cleanFirefoxCache();
+
     // Utility functions
     bool isAdmin() const;
     void showStatistics() const;
@@ -38,7 +49,10 @@ public:
 private:
     // Helper methods
     bool deleteDirectory(const std::wstring& path);
+    std::wstring getLocalAppData() const;
+    std::vector<std::wstring> getBrowserPaths() const;
     
     TempFilesStats tempStats;
     RecycleBinStats recycleBinStats;
+    std::vector<BrowserCacheStats> browserStats;
 }; 

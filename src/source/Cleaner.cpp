@@ -33,10 +33,21 @@ void Cleaner::showStatistics() const {
     std::cout << "  Files deleted: " << tempStats.filesDeleted << "\n";
     std::cout << "  Space freed: " << formatSize(tempStats.bytesFreed) << "\n";
     std::cout << "  Errors encountered: " << tempStats.errors << "\n";
+    
     std::cout << "Recycle Bin:\n";
     std::cout << "  Files deleted: " << recycleBinStats.filesDeleted << "\n";
     std::cout << "  Space freed: " << formatSize(recycleBinStats.bytesFreed) << "\n";
     std::cout << "  Errors encountered: " << recycleBinStats.errors << "\n";
+    
+    if (!browserStats.empty()) {
+        std::cout << "Browser Cache:\n";
+        for (const auto& stats : browserStats) {
+            std::cout << "  " << stats.browserName << ":\n";
+            std::cout << "    Files deleted: " << stats.filesDeleted << "\n";
+            std::cout << "    Space freed: " << formatSize(stats.bytesFreed) << "\n";
+            std::cout << "    Errors encountered: " << stats.errors << "\n";
+        }
+    }
 }
 
 bool Cleaner::cleanTempFiles() {
@@ -124,7 +135,141 @@ std::vector<std::wstring> Cleaner::getTempDirectories() const {
 }
 
 bool Cleaner::cleanBrowserCache() {
-    // TODO: Implement browser cache cleaning
+    bool success = true;
+    browserStats.clear();
+    
+    if (!cleanChromiumCache()) {
+        success = false;
+    }
+    
+    if (!cleanFirefoxCache()) {
+        success = false;
+    }
+    
+    return success;
+}
+
+bool Cleaner::cleanChromiumCache() {
+    const std::wstring localAppData = getLocalAppData();
+    if (localAppData.empty()) return false;
+
+    // Chrome cache paths
+    std::vector<std::wstring> chromePaths = {
+        localAppData + L"\\Google\\Chrome\\User Data\\Default\\Cache",
+        localAppData + L"\\Google\\Chrome\\User Data\\Default\\Code Cache",
+        localAppData + L"\\Google\\Chrome\\User Data\\Default\\GPUCache"
+    };
+
+    // Edge cache paths
+    std::vector<std::wstring> edgePaths = {
+        localAppData + L"\\Microsoft\\Edge\\User Data\\Default\\Cache",
+        localAppData + L"\\Microsoft\\Edge\\User Data\\Default\\Code Cache",
+        localAppData + L"\\Microsoft\\Edge\\User Data\\Default\\GPUCache"
+    };
+
+    BrowserCacheStats chromeStats;
+    chromeStats.browserName = "Google Chrome";
+    
+    // Clean Chrome cache
+    for (const auto& path : chromePaths) {
+        try {
+            if (std::filesystem::exists(path)) {
+                for (const auto& entry : std::filesystem::directory_iterator(path)) {
+                    try {
+                        if (std::filesystem::is_regular_file(entry)) {
+                            uint64_t fileSize = std::filesystem::file_size(entry.path());
+                            if (std::filesystem::remove(entry.path())) {
+                                chromeStats.filesDeleted++;
+                                chromeStats.bytesFreed += fileSize;
+                            }
+                        }
+                    } catch (const std::exception& e) {
+                        chromeStats.errors++;
+                    }
+                }
+            }
+        } catch (const std::exception& e) {
+            chromeStats.errors++;
+        }
+    }
+    
+    BrowserCacheStats edgeStats;
+    edgeStats.browserName = "Microsoft Edge";
+    
+    // Clean Edge cache
+    for (const auto& path : edgePaths) {
+        try {
+            if (std::filesystem::exists(path)) {
+                for (const auto& entry : std::filesystem::directory_iterator(path)) {
+                    try {
+                        if (std::filesystem::is_regular_file(entry)) {
+                            uint64_t fileSize = std::filesystem::file_size(entry.path());
+                            if (std::filesystem::remove(entry.path())) {
+                                edgeStats.filesDeleted++;
+                                edgeStats.bytesFreed += fileSize;
+                            }
+                        }
+                    } catch (const std::exception& e) {
+                        edgeStats.errors++;
+                    }
+                }
+            }
+        } catch (const std::exception& e) {
+            edgeStats.errors++;
+        }
+    }
+
+    browserStats.push_back(chromeStats);
+    browserStats.push_back(edgeStats);
+    
+    return true;
+}
+
+bool Cleaner::cleanFirefoxCache() {
+    const std::wstring localAppData = getLocalAppData();
+    if (localAppData.empty()) return false;
+
+    // Firefox cache paths
+    std::vector<std::wstring> firefoxPaths = {
+        localAppData + L"\\Mozilla\\Firefox\\Profiles"
+    };
+
+    BrowserCacheStats firefoxStats;
+    firefoxStats.browserName = "Mozilla Firefox";
+
+    try {
+        for (const auto& basePath : firefoxPaths) {
+            if (!std::filesystem::exists(basePath)) continue;
+
+            // Iterate through profile directories
+            for (const auto& profile : std::filesystem::directory_iterator(basePath)) {
+                if (!std::filesystem::is_directory(profile)) continue;
+
+                // Cache2 directory contains the browser cache
+                std::wstring cachePath = profile.path() / L"cache2";
+                if (!std::filesystem::exists(cachePath)) continue;
+
+                // Clean cache files
+                for (const auto& entry : std::filesystem::recursive_directory_iterator(cachePath)) {
+                    try {
+                        if (std::filesystem::is_regular_file(entry)) {
+                            uint64_t fileSize = std::filesystem::file_size(entry.path());
+                            if (std::filesystem::remove(entry.path())) {
+                                firefoxStats.filesDeleted++;
+                                firefoxStats.bytesFreed += fileSize;
+                            }
+                        }
+                    } catch (const std::exception& e) {
+                        firefoxStats.errors++;
+                    }
+                }
+            }
+        }
+    } catch (const std::exception& e) {
+        firefoxStats.errors++;
+    }
+
+    browserStats.push_back(firefoxStats);
     return true;
 }
 
@@ -160,4 +305,12 @@ bool Cleaner::deleteFile(const std::string& path) {
         tempStats.errors++;
     }
     return false;
+}
+
+std::wstring Cleaner::getLocalAppData() const {
+    wchar_t path[MAX_PATH];
+    if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, path))) {
+        return std::wstring(path);
+    }
+    return L"";
 } 
