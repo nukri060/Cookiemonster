@@ -8,20 +8,28 @@
 #include <chrono>
 #include <iomanip>
 #include <sstream>
+#include <memory>
+#include <mutex>
 
-// Logging levels
+/**
+ * @brief Logging levels for the application
+ */
 enum class LogLevel {
-    DEBUG,
-    INFO,
-    WARNING,
-    ERROR
+    DEBUG,   ///< Debug information
+    INFO,    ///< General information
+    WARNING, ///< Warning messages
+    ERROR    ///< Error messages
 };
 
+/**
+ * @brief Singleton logger class for the application
+ */
 class Logger {
 private:
     std::ofstream logFile;
     bool consoleOutput;
-    static Logger* instance;
+    static std::unique_ptr<Logger> instance;
+    static std::mutex mutex;
 
     Logger() : consoleOutput(true) {
         auto now = std::chrono::system_clock::now();
@@ -32,13 +40,23 @@ private:
     }
 
 public:
+    /**
+     * @brief Get the singleton instance of the logger
+     * @return Reference to the logger instance
+     */
     static Logger& getInstance() {
+        std::lock_guard<std::mutex> lock(mutex);
         if (!instance) {
-            instance = new Logger();
+            instance = std::make_unique<Logger>();
         }
         return *instance;
     }
 
+    /**
+     * @brief Log a message with specified level
+     * @param level Logging level
+     * @param message Message to log
+     */
     void log(LogLevel level, const std::string& message) {
         std::string levelStr;
         switch (level) {
@@ -61,6 +79,10 @@ public:
         logFile.flush();
     }
 
+    /**
+     * @brief Enable or disable console output
+     * @param enable True to enable console output, false to disable
+     */
     void setConsoleOutput(bool enable) {
         consoleOutput = enable;
     }
@@ -72,45 +94,62 @@ public:
     }
 };
 
+/**
+ * @brief Statistics for temporary files cleaning
+ */
 struct TempFilesStats {
-    int filesDeleted = 0;
-    int errors = 0;
-    uint64_t bytesFreed = 0;  // Size in bytes
-    std::vector<std::string> errorMessages;
+    int filesDeleted = 0;           ///< Number of files deleted
+    int errors = 0;                 ///< Number of errors encountered
+    uint64_t bytesFreed = 0;        ///< Total size of freed space in bytes
+    std::vector<std::string> errorMessages;  ///< List of error messages
 };
 
+/**
+ * @brief Statistics for recycle bin cleaning
+ */
 struct RecycleBinStats {
-    int filesDeleted = 0;
-    int errors = 0;
-    uint64_t bytesFreed = 0;  // Size in bytes
-    std::vector<std::string> errorMessages;
+    int filesDeleted = 0;           ///< Number of files deleted
+    int errors = 0;                 ///< Number of errors encountered
+    uint64_t bytesFreed = 0;        ///< Total size of freed space in bytes
+    std::vector<std::string> errorMessages;  ///< List of error messages
 };
 
+/**
+ * @brief Statistics for browser cache cleaning
+ */
 struct BrowserCacheStats {
-    int filesDeleted = 0;
-    int errors = 0;
-    uint64_t bytesFreed = 0;  // Size in bytes
-    std::string browserName;
-    std::vector<std::string> errorMessages;
+    int filesDeleted = 0;           ///< Number of files deleted
+    int errors = 0;                 ///< Number of errors encountered
+    uint64_t bytesFreed = 0;        ///< Total size of freed space in bytes
+    std::string browserName;        ///< Name of the browser
+    std::vector<std::string> errorMessages;  ///< List of error messages
 };
 
+/**
+ * @brief Statistics for registry cleaning
+ */
 struct RegistryStats {
-    int keysDeleted = 0;
-    int valuesDeleted = 0;
-    int errors = 0;
-    std::vector<std::string> errorMessages;
+    int keysDeleted = 0;            ///< Number of registry keys deleted
+    int valuesDeleted = 0;          ///< Number of registry values deleted
+    int errors = 0;                 ///< Number of errors encountered
+    std::vector<std::string> errorMessages;  ///< List of error messages
 };
 
-// Structure for storing backup information
+/**
+ * @brief Information about a backup operation
+ */
 struct BackupInfo {
-    std::string timestamp;
-    std::string operationType;  // "temp", "registry", "browser", "recycle"
-    std::string backupPath;
-    uint64_t totalSize;
-    std::vector<std::string> files;
-    std::vector<std::pair<std::string, std::string>> registryKeys;  // Path and value
+    std::string timestamp;          ///< Backup creation timestamp
+    std::string operationType;      ///< Type of operation ("temp", "registry", "browser", "recycle")
+    std::string backupPath;         ///< Path to backup files
+    uint64_t totalSize;             ///< Total size of backup in bytes
+    std::vector<std::string> files; ///< List of backed up files
+    std::vector<std::pair<std::string, std::string>> registryKeys;  ///< List of backed up registry keys
 };
 
+/**
+ * @brief Main class for system cleaning operations
+ */
 class Cleaner {
 public:
     Cleaner();
@@ -125,11 +164,14 @@ public:
     // Browser-specific cleaning functions
     bool cleanChromiumCache(bool dryRun = false);  // For Chrome and Edge
     bool cleanFirefoxCache(bool dryRun = false);
+    bool cleanOperaCache(bool dryRun = false);
+    bool cleanBraveCache(bool dryRun = false);
+    bool cleanVivaldiCache(bool dryRun = false);
 
     // Utility functions
     bool isAdmin() const;
     void showStatistics() const;
-    std::string formatSize(uint64_t bytes) const;  // Helper to format size
+    std::string formatSize(uint64_t bytes) const;
     std::vector<std::wstring> getTempDirectories() const;
     bool deleteFile(const std::string& path, bool dryRun = false);
     void setExcludedPaths(const std::vector<std::wstring>& paths);
