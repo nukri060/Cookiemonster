@@ -7,10 +7,51 @@
 #include <filesystem>
 #include <iomanip>
 #include <sstream>
+#include <thread>
+#include <future>
 
-Cleaner::Cleaner() : tempStats(), recycleBinStats() {}
+// Initialize static member
+Logger* Logger::instance = nullptr;
 
-Cleaner::~Cleaner() {}
+Cleaner::Cleaner() : tempStats(), recycleBinStats() {
+    Logger::getInstance().log(LogLevel::INFO, "Cleaner initialized");
+}
+
+Cleaner::~Cleaner() {
+    Logger::getInstance().log(LogLevel::INFO, "Cleaner destroyed");
+}
+
+void Cleaner::logError(const std::string& operation, const std::string& error) {
+    std::string message = "Error in " + operation + ": " + error;
+    Logger::getInstance().log(LogLevel::ERROR, message);
+}
+
+bool Cleaner::isPathExcluded(const std::wstring& path) const {
+    for (const auto& excluded : excludedPaths) {
+        if (path.find(excluded) != std::wstring::npos) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Cleaner::isPathIncluded(const std::wstring& path) const {
+    if (includedPaths.empty()) return true;
+    for (const auto& included : includedPaths) {
+        if (path.find(included) != std::wstring::npos) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void Cleaner::setExcludedPaths(const std::vector<std::wstring>& paths) {
+    excludedPaths = paths;
+}
+
+void Cleaner::setIncludedPaths(const std::vector<std::wstring>& paths) {
+    includedPaths = paths;
+}
 
 std::string Cleaner::formatSize(uint64_t bytes) const {
     const char* units[] = {"B", "KB", "MB", "GB", "TB"};
@@ -28,53 +69,120 @@ std::string Cleaner::formatSize(uint64_t bytes) const {
 }
 
 void Cleaner::showStatistics() const {
-    std::cout << "\nCleaning Statistics:\n";
-    std::cout << "Temporary Files:\n";
-    std::cout << "  Files deleted: " << tempStats.filesDeleted << "\n";
-    std::cout << "  Space freed: " << formatSize(tempStats.bytesFreed) << "\n";
-    std::cout << "  Errors encountered: " << tempStats.errors << "\n";
+    Logger& logger = Logger::getInstance();
+    logger.log(LogLevel::INFO, "Cleaning Statistics:");
+
+    std::stringstream ss;
+    ss << "Temporary Files:\n"
+       << "  Files deleted: " << tempStats.filesDeleted << "\n"
+       << "  Space freed: " << formatSize(tempStats.bytesFreed) << "\n"
+       << "  Errors encountered: " << tempStats.errors;
+    logger.log(LogLevel::INFO, ss.str());
     
-    std::cout << "Recycle Bin:\n";
-    std::cout << "  Files deleted: " << recycleBinStats.filesDeleted << "\n";
-    std::cout << "  Space freed: " << formatSize(recycleBinStats.bytesFreed) << "\n";
-    std::cout << "  Errors encountered: " << recycleBinStats.errors << "\n";
-    
+    if (!tempStats.errorMessages.empty()) {
+        logger.log(LogLevel::ERROR, "Temporary Files Error Details:");
+        for (const auto& error : tempStats.errorMessages) {
+            logger.log(LogLevel::ERROR, "  " + error);
+        }
+    }
+
+    ss.str("");
+    ss << "Recycle Bin:\n"
+       << "  Files deleted: " << recycleBinStats.filesDeleted << "\n"
+       << "  Space freed: " << formatSize(recycleBinStats.bytesFreed) << "\n"
+       << "  Errors encountered: " << recycleBinStats.errors;
+    logger.log(LogLevel::INFO, ss.str());
+
+    if (!recycleBinStats.errorMessages.empty()) {
+        logger.log(LogLevel::ERROR, "Recycle Bin Error Details:");
+        for (const auto& error : recycleBinStats.errorMessages) {
+            logger.log(LogLevel::ERROR, "  " + error);
+        }
+    }
+
     if (!browserStats.empty()) {
-        std::cout << "Browser Cache:\n";
+        logger.log(LogLevel::INFO, "Browser Cache:");
         for (const auto& stats : browserStats) {
-            std::cout << "  " << stats.browserName << ":\n";
-            std::cout << "    Files deleted: " << stats.filesDeleted << "\n";
-            std::cout << "    Space freed: " << formatSize(stats.bytesFreed) << "\n";
-            std::cout << "    Errors encountered: " << stats.errors << "\n";
+            ss.str("");
+            ss << "  " << stats.browserName << ":\n"
+               << "    Files deleted: " << stats.filesDeleted << "\n"
+               << "    Space freed: " << formatSize(stats.bytesFreed) << "\n"
+               << "    Errors encountered: " << stats.errors;
+            logger.log(LogLevel::INFO, ss.str());
+
+            if (!stats.errorMessages.empty()) {
+                logger.log(LogLevel::ERROR, stats.browserName + " Error Details:");
+                for (const auto& error : stats.errorMessages) {
+                    logger.log(LogLevel::ERROR, "  " + error);
+                }
+            }
         }
     }
 }
 
-bool Cleaner::cleanTempFiles() {
+bool Cleaner::cleanTempFiles(bool dryRun) {
+    Logger::getInstance().log(LogLevel::INFO, "Starting temporary files cleanup" + std::string(dryRun ? " (dry run)" : ""));
     tempStats = TempFilesStats();
     auto directories = getTempDirectories();
     
+    std::vector<std::future<void>> futures;
+    
     for (const auto& dir : directories) {
-        try {
-            if (std::filesystem::exists(dir)) {
-                for (const auto& entry : std::filesystem::directory_iterator(dir)) {
-                    try {
-                        if (std::filesystem::is_regular_file(entry)) {
-                            uint64_t fileSize = std::filesystem::file_size(entry.path());
-                            if (std::filesystem::remove(entry.path())) {
-                                tempStats.filesDeleted++;
-                                tempStats.bytesFreed += fileSize;
+        if (isPathExcluded(dir)) {
+            Logger::getInstance().log(LogLevel::INFO, "Skipping excluded directory: " + std::string(dir.begin(), dir.end()));
+            continue;
+        }
+
+        if (!isPathIncluded(dir)) {
+            Logger::getInstance().log(LogLevel::INFO, "Skipping non-included directory: " + std::string(dir.begin(), dir.end()));
+            continue;
+        }
+
+        futures.push_back(std::async(std::launch::async, [this, dir, dryRun]() {
+            try {
+                if (std::filesystem::exists(dir)) {
+                    for (const auto& entry : std::filesystem::directory_iterator(dir)) {
+                        try {
+                            if (std::filesystem::is_regular_file(entry)) {
+                                if (isPathExcluded(entry.path().wstring())) {
+                                    continue;
+                                }
+
+                                uint64_t fileSize = std::filesystem::file_size(entry.path());
+                                if (dryRun) {
+                                    Logger::getInstance().log(LogLevel::INFO, 
+                                        "Would delete: " + entry.path().string() + 
+                                        " (" + formatSize(fileSize) + ")");
+                                } else {
+                                    if (std::filesystem::remove(entry.path())) {
+                                        tempStats.filesDeleted++;
+                                        tempStats.bytesFreed += fileSize;
+                                    }
+                                }
                             }
+                        } catch (const std::exception& e) {
+                            tempStats.errors++;
+                            tempStats.errorMessages.push_back(
+                                "Error processing " + entry.path().string() + ": " + e.what());
+                            logError("cleanTempFiles", e.what());
                         }
-                    } catch (const std::exception& e) {
-                        tempStats.errors++;
                     }
                 }
+            } catch (const std::exception& e) {
+                tempStats.errors++;
+                tempStats.errorMessages.push_back(
+                    "Error processing directory " + std::string(dir.begin(), dir.end()) + ": " + e.what());
+                logError("cleanTempFiles", e.what());
             }
-        } catch (const std::exception& e) {
-            tempStats.errors++;
-        }
+        }));
     }
+
+    // Wait for all async operations to complete
+    for (auto& future : futures) {
+        future.wait();
+    }
+
+    Logger::getInstance().log(LogLevel::INFO, "Temporary files cleanup completed");
     return true;
 }
 
