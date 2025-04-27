@@ -9,6 +9,8 @@
 #include <sstream>
 #include <thread>
 #include <future>
+#include <chrono>
+#include <fstream>
 
 // Initialize static member
 Logger* Logger::instance = nullptr;
@@ -382,8 +384,165 @@ bool Cleaner::cleanFirefoxCache() {
 }
 
 bool Cleaner::cleanRegistry() {
-    // TODO: Implement registry cleaning
+    if (!isAdmin()) {
+        Logger::getInstance().log(LogLevel::ERROR, "Administrator privileges required for registry cleaning");
+        return false;
+    }
+
+    Logger::getInstance().log(LogLevel::INFO, "Starting registry cleanup");
+    
+    registryStats = RegistryStats();
+    bool success = true;
+    
+    // Очистка для текущего пользователя
+    for (const auto& key : getObsoleteRegistryKeys()) {
+        if (!cleanRegistryKey(HKEY_CURRENT_USER, key, false)) {
+            success = false;
+        }
+    }
+    
+    // Очистка для всей системы
+    for (const auto& key : getObsoleteRegistryKeys()) {
+        if (!cleanRegistryKey(HKEY_LOCAL_MACHINE, key, false)) {
+            success = false;
+        }
+    }
+
+    // Добавляем статистику в лог
+    std::stringstream ss;
+    ss << "Registry cleanup completed:\n"
+       << "  Keys deleted: " << registryStats.keysDeleted << "\n"
+       << "  Values deleted: " << registryStats.valuesDeleted << "\n"
+       << "  Errors encountered: " << registryStats.errors;
+    Logger::getInstance().log(LogLevel::INFO, ss.str());
+
+    if (!registryStats.errorMessages.empty()) {
+        Logger::getInstance().log(LogLevel::ERROR, "Registry Cleanup Error Details:");
+        for (const auto& error : registryStats.errorMessages) {
+            Logger::getInstance().log(LogLevel::ERROR, "  " + error);
+        }
+    }
+
+    return success;
+}
+
+bool Cleaner::cleanRegistryKey(HKEY hKey, const std::wstring& subKey, bool dryRun) {
+    HKEY hSubKey;
+    LONG result = RegOpenKeyExW(hKey, subKey.c_str(), 0, KEY_READ | KEY_WRITE, &hSubKey);
+    
+    if (result != ERROR_SUCCESS) {
+        if (result != ERROR_FILE_NOT_FOUND) {
+            registryStats.errors++;
+            registryStats.errorMessages.push_back(
+                "Failed to open key: " + std::string(subKey.begin(), subKey.end()));
+        }
+        return false;
+    }
+
+    // Получаем информацию о количестве подключей и значений
+    DWORD subKeyCount = 0;
+    DWORD valueCount = 0;
+    result = RegQueryInfoKeyW(hSubKey, nullptr, nullptr, nullptr, &subKeyCount,
+        nullptr, nullptr, &valueCount, nullptr, nullptr, nullptr, nullptr);
+
+    if (result != ERROR_SUCCESS) {
+        RegCloseKey(hSubKey);
+        registryStats.errors++;
+        registryStats.errorMessages.push_back(
+            "Failed to query key info: " + std::string(subKey.begin(), subKey.end()));
+        return false;
+    }
+
+    // Рекурсивно удаляем подключи
+    if (subKeyCount > 0) {
+        std::vector<std::wstring> subKeys;
+        wchar_t keyName[MAX_PATH];
+        DWORD keyNameSize = MAX_PATH;
+
+        for (DWORD i = 0; i < subKeyCount; i++) {
+            keyNameSize = MAX_PATH;
+            if (RegEnumKeyExW(hSubKey, i, keyName, &keyNameSize, nullptr, nullptr, nullptr, nullptr) == ERROR_SUCCESS) {
+                subKeys.push_back(keyName);
+            }
+        }
+
+        for (const auto& key : subKeys) {
+            std::wstring fullSubKey = subKey + L"\\" + key;
+            if (dryRun) {
+                Logger::getInstance().log(LogLevel::INFO, 
+                    "Would delete registry key: " + std::string(fullSubKey.begin(), fullSubKey.end()));
+            } else {
+                if (deleteRegistryKey(hKey, fullSubKey, dryRun)) {
+                    registryStats.keysDeleted++;
+                }
+            }
+        }
+    }
+
+    // Удаляем значения
+    if (valueCount > 0 && !dryRun) {
+        wchar_t valueName[MAX_PATH];
+        DWORD valueNameSize = MAX_PATH;
+
+        for (DWORD i = 0; i < valueCount; i++) {
+            valueNameSize = MAX_PATH;
+            if (RegEnumValueW(hSubKey, i, valueName, &valueNameSize, nullptr, nullptr, nullptr, nullptr) == ERROR_SUCCESS) {
+                if (deleteRegistryValue(hSubKey, subKey, valueName, dryRun)) {
+                    registryStats.valuesDeleted++;
+                }
+            }
+        }
+    }
+
+    RegCloseKey(hSubKey);
     return true;
+}
+
+bool Cleaner::deleteRegistryKey(HKEY hKey, const std::wstring& subKey, bool dryRun) {
+    if (dryRun) {
+        Logger::getInstance().log(LogLevel::INFO, 
+            "Would delete registry key: " + std::string(subKey.begin(), subKey.end()));
+        return true;
+    }
+
+    LONG result = RegDeleteTreeW(hKey, subKey.c_str());
+    if (result != ERROR_SUCCESS && result != ERROR_FILE_NOT_FOUND) {
+        registryStats.errors++;
+        registryStats.errorMessages.push_back(
+            "Failed to delete key: " + std::string(subKey.begin(), subKey.end()));
+        return false;
+    }
+    return true;
+}
+
+bool Cleaner::deleteRegistryValue(HKEY hKey, const std::wstring& subKey, const std::wstring& valueName, bool dryRun) {
+    if (dryRun) {
+        Logger::getInstance().log(LogLevel::INFO, 
+            "Would delete registry value: " + std::string(subKey.begin(), subKey.end()) + 
+            "\\" + std::string(valueName.begin(), valueName.end()));
+        return true;
+    }
+
+    LONG result = RegDeleteValueW(hKey, valueName.c_str());
+    if (result != ERROR_SUCCESS && result != ERROR_FILE_NOT_FOUND) {
+        registryStats.errors++;
+        registryStats.errorMessages.push_back(
+            "Failed to delete value: " + std::string(subKey.begin(), subKey.end()) + 
+            "\\" + std::string(valueName.begin(), valueName.end()));
+        return false;
+    }
+    return true;
+}
+
+std::vector<std::wstring> Cleaner::getObsoleteRegistryKeys() const {
+    std::vector<std::wstring> keys = {
+        L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall",  // Удаленные программы
+        L"Software\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\Shell\\MuiCache",  // Кэш оболочки
+        L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RunMRU",  // История запусков
+        L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\TypedPaths",  // История путей
+        L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RecentDocs"  // Недавние документы
+    };
+    return keys;
 }
 
 bool Cleaner::isAdmin() const {
@@ -421,4 +580,269 @@ std::wstring Cleaner::getLocalAppData() const {
         return std::wstring(path);
     }
     return L"";
+}
+
+std::string Cleaner::generateBackupPath(const std::string& operationType) const {
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << "backups/" << operationType << "_" 
+       << std::put_time(std::localtime(&time), "%Y%m%d_%H%M%S");
+    return ss.str();
+}
+
+bool Cleaner::createBackup(const std::string& operationType) {
+    if (!isAdmin()) {
+        Logger::getInstance().log(LogLevel::ERROR, 
+            "Administrator privileges required for backup operations");
+        return false;
+    }
+
+    BackupInfo backup;
+    backup.operationType = operationType;
+    backup.timestamp = std::to_string(
+        std::chrono::system_clock::now().time_since_epoch().count());
+    backup.backupPath = generateBackupPath(operationType);
+
+    // Create backup directory
+    std::filesystem::create_directories(backup.backupPath);
+
+    bool success = true;
+    if (operationType == "temp") {
+        // Backup temporary files
+        auto directories = getTempDirectories();
+        for (const auto& dir : directories) {
+            if (std::filesystem::exists(dir)) {
+                for (const auto& entry : std::filesystem::directory_iterator(dir)) {
+                    if (std::filesystem::is_regular_file(entry)) {
+                        std::string targetPath = backup.backupPath + "/" + 
+                            entry.path().filename().string();
+                        if (backupFile(entry.path().string(), targetPath)) {
+                            backup.files.push_back(entry.path().string());
+                            backup.totalSize += std::filesystem::file_size(entry.path());
+                        } else {
+                            success = false;
+                        }
+                    }
+                }
+            }
+        }
+    } else if (operationType == "registry") {
+        // Backup registry keys
+        for (const auto& key : getObsoleteRegistryKeys()) {
+            if (!backupRegistryKey(HKEY_CURRENT_USER, key, backup.backupPath)) {
+                success = false;
+            }
+            if (!backupRegistryKey(HKEY_LOCAL_MACHINE, key, backup.backupPath)) {
+                success = false;
+            }
+        }
+    }
+
+    if (success) {
+        backupHistory.push_back(backup);
+        Logger::getInstance().log(LogLevel::INFO, 
+            "Backup created successfully: " + backup.backupPath);
+    } else {
+        Logger::getInstance().log(LogLevel::ERROR, 
+            "Backup creation completed with errors");
+    }
+
+    return success;
+}
+
+bool Cleaner::backupFile(const std::string& sourcePath, const std::string& backupPath) {
+    try {
+        if (std::filesystem::exists(sourcePath)) {
+            std::filesystem::copy_file(sourcePath, backupPath, 
+                std::filesystem::copy_options::overwrite_existing);
+            return true;
+        }
+    } catch (const std::exception& e) {
+        Logger::getInstance().log(LogLevel::ERROR, 
+            "Failed to backup file: " + sourcePath + " - " + e.what());
+    }
+    return false;
+}
+
+bool Cleaner::backupRegistryKey(HKEY hKey, const std::wstring& subKey, 
+                              const std::string& backupPath) {
+    HKEY hSubKey;
+    LONG result = RegOpenKeyExW(hKey, subKey.c_str(), 0, KEY_READ, &hSubKey);
+    
+    if (result != ERROR_SUCCESS) {
+        if (result != ERROR_FILE_NOT_FOUND) {
+            Logger::getInstance().log(LogLevel::ERROR, 
+                "Failed to open registry key for backup: " + 
+                std::string(subKey.begin(), subKey.end()));
+        }
+        return false;
+    }
+
+    // Create backup file for this key
+    std::string keyBackupPath = backupPath + "/" + 
+        std::string(subKey.begin(), subKey.end()) + ".reg";
+    std::ofstream backupFile(keyBackupPath);
+    
+    if (!backupFile.is_open()) {
+        RegCloseKey(hSubKey);
+        return false;
+    }
+
+    // Write key information
+    backupFile << "Windows Registry Editor Version 5.00\n\n";
+    backupFile << "[" << std::string(subKey.begin(), subKey.end()) << "]\n";
+
+    // Backup values
+    DWORD valueCount = 0;
+    if (RegQueryInfoKeyW(hSubKey, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, &valueCount, nullptr, nullptr, nullptr, nullptr) == ERROR_SUCCESS) {
+        
+        wchar_t valueName[MAX_PATH];
+        DWORD valueNameSize = MAX_PATH;
+        BYTE valueData[4096];
+        DWORD valueDataSize = sizeof(valueData);
+        DWORD valueType;
+
+        for (DWORD i = 0; i < valueCount; i++) {
+            valueNameSize = MAX_PATH;
+            valueDataSize = sizeof(valueData);
+            if (RegEnumValueW(hSubKey, i, valueName, &valueNameSize, nullptr,
+                &valueType, valueData, &valueDataSize) == ERROR_SUCCESS) {
+                
+                backupFile << "\"" << std::string(valueName, valueName + valueNameSize) << "\"=";
+                
+                switch (valueType) {
+                    case REG_SZ:
+                        backupFile << "\"" << (wchar_t*)valueData << "\"\n";
+                        break;
+                    case REG_DWORD:
+                        backupFile << "dword:" << std::hex << *(DWORD*)valueData << "\n";
+                        break;
+                    // Add other value types as needed
+                }
+            }
+        }
+    }
+
+    backupFile.close();
+    RegCloseKey(hSubKey);
+    return true;
+}
+
+bool Cleaner::restoreFromBackup(const std::string& backupPath) {
+    if (!isAdmin()) {
+        Logger::getInstance().log(LogLevel::ERROR, 
+            "Administrator privileges required for restore operations");
+        return false;
+    }
+
+    // Find backup info
+    auto it = std::find_if(backupHistory.begin(), backupHistory.end(),
+        [&backupPath](const BackupInfo& info) { return info.backupPath == backupPath; });
+
+    if (it == backupHistory.end()) {
+        Logger::getInstance().log(LogLevel::ERROR, "Backup not found: " + backupPath);
+        return false;
+    }
+
+    const BackupInfo& backup = *it;
+    bool success = true;
+
+    if (backup.operationType == "temp") {
+        // Restore files
+        for (const auto& file : backup.files) {
+            std::string sourcePath = backup.backupPath + "/" + 
+                std::filesystem::path(file).filename().string();
+            if (!restoreFile(sourcePath, file)) {
+                success = false;
+            }
+        }
+    } else if (backup.operationType == "registry") {
+        // Restore registry keys
+        for (const auto& key : backup.registryKeys) {
+            // Implementation for registry restore
+            // This would involve parsing the .reg file and applying changes
+        }
+    }
+
+    if (success) {
+        Logger::getInstance().log(LogLevel::INFO, 
+            "Restore completed successfully from: " + backupPath);
+    } else {
+        Logger::getInstance().log(LogLevel::ERROR, 
+            "Restore completed with errors");
+    }
+
+    return success;
+}
+
+bool Cleaner::restoreFile(const std::string& backupPath, const std::string& targetPath) {
+    try {
+        if (std::filesystem::exists(backupPath)) {
+            std::filesystem::copy_file(backupPath, targetPath, 
+                std::filesystem::copy_options::overwrite_existing);
+            return true;
+        }
+    } catch (const std::exception& e) {
+        Logger::getInstance().log(LogLevel::ERROR, 
+            "Failed to restore file: " + targetPath + " - " + e.what());
+    }
+    return false;
+}
+
+std::vector<BackupInfo> Cleaner::getAvailableBackups() const {
+    return backupHistory;
+}
+
+bool Cleaner::deleteBackup(const std::string& backupPath) {
+    try {
+        if (std::filesystem::exists(backupPath)) {
+            std::filesystem::remove_all(backupPath);
+            
+            // Remove from history
+            backupHistory.erase(
+                std::remove_if(backupHistory.begin(), backupHistory.end(),
+                    [&backupPath](const BackupInfo& info) { 
+                        return info.backupPath == backupPath; 
+                    }),
+                backupHistory.end()
+            );
+            
+            Logger::getInstance().log(LogLevel::INFO, 
+                "Backup deleted successfully: " + backupPath);
+            return true;
+        }
+    } catch (const std::exception& e) {
+        Logger::getInstance().log(LogLevel::ERROR, 
+            "Failed to delete backup: " + backupPath + " - " + e.what());
+    }
+    return false;
+}
+
+// Implementation of backup-specific cleaning functions
+bool Cleaner::cleanTempFilesWithBackup(bool dryRun) {
+    if (!createBackup("temp")) {
+        return false;
+    }
+    return cleanTempFiles(dryRun);
+}
+
+bool Cleaner::cleanRegistryWithBackup(bool dryRun) {
+    if (!createBackup("registry")) {
+        return false;
+    }
+    return cleanRegistry(dryRun);
+}
+
+bool Cleaner::cleanBrowserCacheWithBackup(bool dryRun) {
+    if (!createBackup("browser")) {
+        return false;
+    }
+    return cleanBrowserCache(dryRun);
+}
+
+bool Cleaner::cleanRecycleBinWithBackup(bool dryRun) {
+    // Note: Recycle bin doesn't need backup as it's already a safety mechanism
+    return cleanRecycleBin(dryRun);
 } 

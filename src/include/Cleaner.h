@@ -94,6 +94,23 @@ struct BrowserCacheStats {
     std::vector<std::string> errorMessages;
 };
 
+struct RegistryStats {
+    int keysDeleted = 0;
+    int valuesDeleted = 0;
+    int errors = 0;
+    std::vector<std::string> errorMessages;
+};
+
+// Structure for storing backup information
+struct BackupInfo {
+    std::string timestamp;
+    std::string operationType;  // "temp", "registry", "browser", "recycle"
+    std::string backupPath;
+    uint64_t totalSize;
+    std::vector<std::string> files;
+    std::vector<std::pair<std::string, std::string>> registryKeys;  // Path and value
+};
+
 class Cleaner {
 public:
     Cleaner();
@@ -118,6 +135,22 @@ public:
     void setExcludedPaths(const std::vector<std::wstring>& paths);
     void setIncludedPaths(const std::vector<std::wstring>& paths);
 
+    // Registry cleaning functions
+    bool cleanRegistryKey(HKEY hKey, const std::wstring& subKey, bool dryRun = false);
+    std::vector<std::wstring> getObsoleteRegistryKeys() const;
+
+    // Backup and restore functions
+    bool createBackup(const std::string& operationType);
+    bool restoreFromBackup(const std::string& backupPath);
+    std::vector<BackupInfo> getAvailableBackups() const;
+    bool deleteBackup(const std::string& backupPath);
+    
+    // Backup-specific cleaning functions
+    bool cleanTempFilesWithBackup(bool dryRun = false);
+    bool cleanRegistryWithBackup(bool dryRun = false);
+    bool cleanBrowserCacheWithBackup(bool dryRun = false);
+    bool cleanRecycleBinWithBackup(bool dryRun = false);
+
 private:
     // Helper methods
     bool deleteDirectory(const std::wstring& path, bool dryRun = false);
@@ -132,4 +165,18 @@ private:
     std::vector<BrowserCacheStats> browserStats;
     std::vector<std::wstring> excludedPaths;
     std::vector<std::wstring> includedPaths;
+    RegistryStats registryStats;
+    
+    // Registry helper methods
+    bool deleteRegistryKey(HKEY hKey, const std::wstring& subKey, bool dryRun = false);
+    bool deleteRegistryValue(HKEY hKey, const std::wstring& subKey, const std::wstring& valueName, bool dryRun = false);
+
+    // Backup helper methods
+    std::string generateBackupPath(const std::string& operationType) const;
+    bool backupFile(const std::string& sourcePath, const std::string& backupPath);
+    bool backupRegistryKey(HKEY hKey, const std::wstring& subKey, const std::string& backupPath);
+    bool restoreFile(const std::string& backupPath, const std::string& targetPath);
+    bool restoreRegistryKey(const std::string& backupPath, HKEY hKey, const std::wstring& subKey);
+    
+    std::vector<BackupInfo> backupHistory;
 }; 
