@@ -12,6 +12,24 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
+# Enable sanitizers in debug builds
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fsanitize=undefined")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address -fsanitize=undefined")
+endif()
+
+# Add compiler warnings
+if(MSVC)
+    add_compile_options(/W4 /WX)
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+endif()
+
+# Add vcpkg support
+if(DEFINED ENV{VCPKG_ROOT})
+    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
+endif()
+
 # Add Catch2
 include(FetchContent)
 FetchContent_Declare(
@@ -44,6 +62,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
+    _CRT_SECURE_NO_WARNINGS
 )
 
 # Link libraries
@@ -53,8 +72,10 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 )
 
 # Add tests
-set(TEST_SOURCES
-    tests/src/CleanerTests.cpp
+file(GLOB_RECURSE TEST_SOURCES 
+    tests/src/*.cpp
+    tests/unit/*.cpp
+    tests/integration/*.cpp
 )
 
 # Create test executable
@@ -76,6 +97,12 @@ target_include_directories(${PROJECT_NAME}_tests PRIVATE
 enable_testing()
 add_test(NAME ${PROJECT_NAME}_tests COMMAND ${PROJECT_NAME}_tests)
 
+# Add code coverage if available
+if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(${PROJECT_NAME}_tests PRIVATE --coverage)
+    target_link_options(${PROJECT_NAME}_tests PRIVATE --coverage)
+endif()
+
 # Install rules
 install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION bin
@@ -87,3 +114,13 @@ install(TARGETS ${PROJECT_NAME}
 install(FILES ${HEADERS}
     DESTINATION include/${PROJECT_NAME}
 )
+
+# Add custom target for running tests with coverage
+if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_custom_target(coverage
+        COMMAND ${PROJECT_NAME}_tests
+        COMMAND gcovr -r ${CMAKE_SOURCE_DIR} --html --html-details -o coverage.html
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Generating coverage report"
+    )
+endif()
